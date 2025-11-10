@@ -1,0 +1,162 @@
+.import-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.import-dialog, .loading-dialog {
+  background: #121212;
+  padding: 30px;
+  border-radius: 8px;
+  border: 1px solid #40EDC3;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+}
+
+.loading-dialog {
+  text-align: center;
+  min-width: 400px;
+}
+
+.close-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 32px;
+  height: 32px;
+  background: #191919;
+  border: 1px solid #2E2E2E;
+  border-radius: 50%;
+  color: #9C9C9C;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #2E2E2E;
+  color: #FFFFFF;
+}
+
+.import-title, .loading-title {
+  font-size: 18px;
+  color: #40EDC3;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.loading-title {
+  font-size: 18px;
+  margin-bottom: 15px;
+}
+
+.import-subtitle {
+  font-size: 14px;
+  color: #9C9C9C;
+  margin-bottom: 20px;
+}
+
+.file-input-group {
+  margin-bottom: 15px;
+}
+
+.file-label {
+  color: #FFFFFF;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.required {
+  color: #F38181;
+}
+
+.optional {
+  color: #9C9C9C;
+  font-size: 11px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 8px;
+  background: #191919;
+  border: 1px solid #2E2E2E;
+  border-radius: 4px;
+  color: #FFFFFF;
+  font-size: 14px;
+}
+
+.file-input::-webkit-file-upload-button {
+  background: #2E2E2E;
+  border: 1px solid #40EDC3;
+  color: #40EDC3;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.file-input::-webkit-file-upload-button:hover {
+  background: #40EDC3;
+  color: #000000;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn, .load-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: #191919;
+  border: 1px solid #2E2E2E;
+  color: #FFFFFF;
+}
+
+.cancel-btn:hover {
+  background: #2E2E2E;
+}
+
+.load-btn {
+  background: linear-gradient(90.72deg, #40EDC3 0%, #7FFBA9 49.62%, #D3F89A 100%);
+  border: none;
+  color: #000000;
+}
+
+.load-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 237, 195, 0.3);
+}
+
+.loading-item {
+  font-size: 13px;
+  color: #9C9C9C;
+  margin-bottom: 8px;
+}
+
+.loading-message {
+  font-size: 12px;
+  color: #7FFBA9;
+  margin-top: 15px;
+}

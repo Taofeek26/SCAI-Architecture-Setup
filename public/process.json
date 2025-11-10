@@ -1,0 +1,3221 @@
+{
+  "version": "2.0.0",
+  "metadata": {
+    "source": "SCAI Content Generation Process Map",
+    "importedAt": "2025-10-10T00:00:00Z",
+    "originalFormat": "javascript",
+    "totalRequirements": 51,
+    "embeddedRequirements": 0,
+    "totalProcessMaps": 1,
+    "totalResources": 75,
+    "totalConnections": 267,
+    "lastValidated": "2025-10-21",
+    "schemaType": "ProcessOriented"
+  },
+  "namingConvention": {
+    "pattern": "SCAI-{Environment}-{Layer}-{Function}",
+    "environment": [
+      "Prod",
+      "Dev",
+      "Test"
+    ],
+    "layers": [
+      "Core",
+      "Orchestration",
+      "Comm",
+      "Deploy",
+      "Security",
+      "Data",
+      "Monitor"
+    ],
+    "exceptions": {
+      "s3Buckets": "scai-{env}-{purpose}-{accountid} (lowercase, AWS constraint)",
+      "cloudWatchLogGroups": "/aws/lambda/{FunctionName} (AWS-managed prefix)",
+      "apiGateway": "Use Tag Name=SCAI-... for console names"
+    }
+  },
+  "layers": [
+    {
+      "id": 1,
+      "name": "Core Logic & Entry"
+    },
+    {
+      "id": 2,
+      "name": "AI Orchestration & Intelligence"
+    },
+    {
+      "id": 3,
+      "name": "Communication & Real-time Updates"
+    },
+    {
+      "id": 4,
+      "name": "Deployment & Infrastructure"
+    },
+    {
+      "id": 5,
+      "name": "Security & Secrets"
+    },
+    {
+      "id": 6,
+      "name": "Data Storage & State"
+    },
+    {
+      "id": 7,
+      "name": "Infrastructure & Monitoring"
+    }
+  ],
+  "processMaps": [
+    {
+      "id": "content-generation-workflow",
+      "name": "SCAI Content Generation Workflow",
+      "description": "Complete 6-phase workflow for AI-powered content generation from keyword entry through WordPress deployment",
+      "externalEntities": [
+        "User Interface",
+        "DataForSEO API",
+        "OpenAI API (GPT-4-turbo)",
+        "FAL Flux API (flux-pro-1.1)",
+        "Cloudways API",
+        "WordPress Sites"
+      ],
+      "resources": [
+        {
+          "masterCount": 1,
+          "processOrder": "0.01",
+          "id": "SCAI-Prod-Security-LambdaExecutionRole",
+          "name": "Lambda Execution Role",
+          "type": "iam",
+          "category": "security",
+          "layer": 7,
+          "metadata": {
+            "type": "IAM Role",
+            "purpose": "Base execution role for Lambda functions",
+            "description": "Provides basic Lambda execution permissions including CloudWatch Logs",
+            "capabilities": [
+              "Lambda service assume role",
+              "CloudWatch Logs write access",
+              "Basic execution permissions"
+            ],
+            "integrations": [
+              "Lambda",
+              "CloudWatch Logs"
+            ]
+          },
+          "connections": {
+            "inbound": [],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Monitor-LambdaLogGroup",
+                "label": "grants write access"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 2,
+          "processOrder": "0.02",
+          "id": "SCAI-Prod-Orchestration-AIExecutionRole",
+          "name": "AI Execution Role",
+          "type": "iam",
+          "category": "security",
+          "layer": 7,
+          "metadata": {
+            "type": "IAM Role",
+            "purpose": "AI Lambda permissions with external API access",
+            "description": "Execution role for AI orchestration Lambdas with S3, DynamoDB, and Secrets Manager permissions for OpenAI/FAL API keys",
+            "capabilities": [
+              "External AI API access (via secrets)",
+              "S3 template read access",
+              "DynamoDB state management",
+              "Secrets Manager access"
+            ],
+            "integrations": [
+              "S3",
+              "DynamoDB",
+              "Secrets Manager"
+            ]
+          },
+          "connections": {
+            "inbound": [],
+            "outbound": [
+              {
+                "target": "scai-prod-prompttemplates-{AccountId}",
+                "label": "grants read access"
+              },
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "grants read access"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 3,
+          "processOrder": "0.03",
+          "id": "SCAI-Prod-Deploy-DeploymentExecutionRole",
+          "name": "Deployment Execution Role",
+          "type": "iam",
+          "category": "security",
+          "layer": 7,
+          "metadata": {
+            "type": "IAM Role",
+            "purpose": "Deployment Lambda permissions",
+            "description": "Execution role for deployment Lambdas with API client access",
+            "capabilities": [
+              "External API calls",
+              "S3 asset upload",
+              "DynamoDB deployment tracking",
+              "Secrets Manager credential access"
+            ],
+            "integrations": [
+              "Cloudways API",
+              "WordPress API",
+              "S3",
+              "DynamoDB"
+            ]
+          },
+          "connections": {
+            "inbound": [],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Security-CloudwaysAPIClient",
+                "label": "grants API access"
+              },
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "grants read access"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 4,
+          "processOrder": "0.04",
+          "id": "SCAI-Prod-Deploy-StepFunctionExecutionRole",
+          "name": "Step Function Execution Role",
+          "type": "iam",
+          "category": "security",
+          "layer": 7,
+          "metadata": {
+            "type": "IAM Role",
+            "purpose": "Step Functions orchestration permissions",
+            "description": "Execution role for Step Functions state machines to invoke Lambdas and manage workflow",
+            "capabilities": [
+              "Lambda invocation",
+              "CloudWatch Logs write",
+              "X-Ray tracing"
+            ],
+            "integrations": [
+              "Lambda",
+              "CloudWatch",
+              "X-Ray"
+            ]
+          },
+          "connections": {
+            "inbound": [],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-DeploymentOrchestrator",
+                "label": "can invoke"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 5,
+          "processOrder": "0.015",
+          "id": "SCAI-Prod-Monitor-LambdaLogGroup",
+          "name": "Lambda Function Logs",
+          "type": "cloudwatchloggroup",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Log Group",
+            "purpose": "Lambda execution logs",
+            "description": "Structured logging for all Lambda functions with 30-day retention",
+            "capabilities": [
+              "Structured logging",
+              "Log retention management",
+              "CloudWatch Insights queries",
+              "Metric filters"
+            ],
+            "integrations": [
+              "Lambda",
+              "CloudWatch Metrics"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentEntryAPI",
+                "label": "write logs"
+              },
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "write logs"
+              },
+              {
+                "source": "SCAI-Prod-Security-LambdaExecutionRole",
+                "label": "connection"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Monitor-ErrorCountMetric",
+                "label": "metric filter"
+              },
+              {
+                "target": "SCAI-Prod-Monitor-LambdaErrorAlarm",
+                "label": "connection"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 6,
+          "processOrder": "0.016",
+          "id": "SCAI-Prod-Monitor-APIGatewayLogGroup",
+          "name": "API Gateway Logs",
+          "type": "cloudwatchloggroup",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Log Group",
+            "purpose": "API Gateway request/response logs",
+            "description": "Full request/response logging for API Gateway endpoints",
+            "capabilities": [
+              "Request/response logging",
+              "Access logging",
+              "Error tracking"
+            ],
+            "integrations": [
+              "API Gateway",
+              "CloudWatch Metrics"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentEntryAPI",
+                "label": "write access logs"
+              },
+              {
+                "source": "SCAI-Prod-Comm-WebSocketAPI",
+                "label": "write access logs"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 7,
+          "processOrder": "0.017",
+          "id": "SCAI-Prod-Monitor-StepFunctionLogGroup",
+          "name": "Step Functions Execution Logs",
+          "type": "cloudwatchloggroup",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Log Group",
+            "purpose": "Step Functions execution logs",
+            "description": "Detailed execution logs for Step Functions workflows",
+            "capabilities": [
+              "Execution history",
+              "State transition logging",
+              "Error tracking"
+            ],
+            "integrations": [
+              "Step Functions",
+              "X-Ray"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-DeploymentOrchestrator",
+                "label": "write execution logs"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Monitor-DeploymentFailureAlarm",
+                "label": "connection"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 8,
+          "processOrder": "0.05",
+          "id": "SCAI-Prod-Core-ProjectManagementAPI",
+          "name": "Project Management API",
+          "type": "apigateway",
+          "category": "api",
+          "layer": 1,
+          "metadata": {
+            "type": "API Gateway",
+            "purpose": "REST API gateway for project management operations",
+            "description": "API Gateway exposing REST endpoints for project CRUD operations. Routes to backend Lambda handlers",
+            "capabilities": [
+              "POST /projects - Create project",
+              "GET /projects - List user projects",
+              "GET /projects/{id} - Get project details",
+              "PUT /projects/{id} - Update project",
+              "DELETE /projects/{id} - Delete project",
+              "GET /projects/{id}/articles - List articles in project"
+            ],
+            "integrations": [
+              "Content Generation Tab UI",
+              "Site Builder UI",
+              "Project Dashboard"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "User Interface",
+                "label": "API requests"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ProjectCRUDHandler",
+                "label": "invoke for CRUD operations"
+              },
+              {
+                "target": "SCAI-Prod-Core-ProjectQueryHandler",
+                "label": "invoke for queries"
+              },
+              {
+                "target": "SCAI-Prod-Core-ProjectDeletionHandler",
+                "label": "invoke for deletion"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 9,
+          "processOrder": "0.06",
+          "id": "SCAI-Prod-Core-ProjectCRUDHandler",
+          "name": "Project CRUD Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Handle CREATE, UPDATE project operations",
+            "description": "Business logic for creating new projects and updating project metadata. Validates input, generates projectId, writes to DynamoDB",
+            "capabilities": [
+              "Create new project record",
+              "Validate project input",
+              "Generate unique projectId",
+              "Update project metadata",
+              "Update project status"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ProjectManagementAPI",
+                "label": "POST/PUT requests"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Data-ProjectMetadataTable",
+                "label": "PutItem/UpdateItem"
+              },
+              {
+                "target": "SCAI-Prod-Data-UserContextStore",
+                "label": "update user history"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 10,
+          "processOrder": "0.07",
+          "id": "SCAI-Prod-Core-ProjectQueryHandler",
+          "name": "Project Query Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Handle READ operations for projects",
+            "description": "Retrieves project lists, details, and associated articles. Supports filtering, pagination, and sorting",
+            "capabilities": [
+              "List all user projects",
+              "Get single project details",
+              "List articles in project",
+              "Filter by status",
+              "Paginate results",
+              "Sort by date/name"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ProjectManagementAPI",
+                "label": "GET requests"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Data-ProjectMetadataTable",
+                "label": "Query/GetItem"
+              },
+              {
+                "target": "SCAI-Prod-Data-ProjectArticlesTable",
+                "label": "Query for articles"
+              },
+              {
+                "target": "SCAI-Prod-Data-ArticleMetadataTable",
+                "label": "GetItem for article details"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 11,
+          "processOrder": "0.08",
+          "id": "SCAI-Prod-Core-ProjectDeletionHandler",
+          "name": "Project Deletion Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Handle DELETE operations with cascade logic",
+            "description": "Deletes project and optionally cascades to delete all associated articles from S3, DynamoDB, and related tables. Supports soft-delete (archive) mode",
+            "capabilities": [
+              "Delete project metadata",
+              "Cascade delete articles",
+              "Delete from S3 storage",
+              "Delete from ArticleMetadataTable",
+              "Delete from ProjectArticlesTable",
+              "Soft-delete (archive) option",
+              "Batch deletion for articles"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ProjectManagementAPI",
+                "label": "DELETE requests"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Data-ProjectMetadataTable",
+                "label": "DeleteItem"
+              },
+              {
+                "target": "SCAI-Prod-Data-ProjectArticlesTable",
+                "label": "Query + BatchDeleteItem"
+              },
+              {
+                "target": "SCAI-Prod-Data-ArticleMetadataTable",
+                "label": "BatchDeleteItem"
+              },
+              {
+                "target": "scai-prod-enhancedarticle-{AccountId}",
+                "label": "S3 DeleteObjects"
+              },
+              {
+                "target": "scai-prod-images-{AccountId}",
+                "label": "S3 DeleteObjects"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 12,
+          "processOrder": "0.1",
+          "id": "SCAI-Prod-Core-ContentEntryAPI",
+          "name": "Content Entry API",
+          "type": "apigateway",
+          "category": "api",
+          "layer": 1,
+          "metadata": {
+            "type": "API Gateway",
+            "purpose": "Comprehensive Content Generation API with third-party integration support",
+            "description": "Central REST API Gateway exposing comprehensive content generation endpoints. Accepts all generation parameters (tone, word count, image style, settings), supports third-party integrations via webhooks, and provides status callbacks for external systems",
+            "capabilities": [
+              "Accept comprehensive generation parameters (tone, word count, image style, article type)",
+              "Content settings: tone (54 options), word count (600-3000), language (57 options)",
+              "Image settings: image style (11 options), featured image, H2 images, filter unwanted objects",
+              "SEO settings: title tag, meta description, FAQ, tagline, local NAP",
+              "Quality controls: negative words filter, phrase blocking, find & replace",
+              "Article type: Informational, Commercial, Local, How-To, Comparison, Review, Listicle, Affiliate, Recipe",
+              "Third-party integration: webhook callbacks for status updates",
+              "External system notifications",
+              "Receive manual keyword entry requests",
+              "Receive bulk generation requests (multi-cluster support)",
+              "Receive preview requests",
+              "Receive deploy requests",
+              "Validate all request parameters",
+              "Extract context parameter",
+              "API key authentication for third-party systems",
+              "Return generation job IDs"
+            ],
+            "integrations": [
+              "Content Generation Tab UI",
+              "Bulk Content Generation UI",
+              "Site Builder Preview",
+              "Site Builder Deploy",
+              "Third-party WordPress plugins",
+              "External content management systems"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "User Interface",
+                "label": "POST /generate"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-RequestRouter",
+                "label": "forward request"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-001"
+          ]
+        },
+        {
+          "masterCount": 2,
+          "processOrder": "0.2",
+          "id": "SCAI-Prod-Core-RequestRouter",
+          "name": "Request Router",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Route requests based on context parameter",
+            "description": "Examines incoming request context and routes to appropriate workflow path (manual entry or auto-population). Acts as the central routing logic for all content generation entry points",
+            "capabilities": [
+              "Parse request context",
+              "Route to manual entry path",
+              "Route to auto-population path",
+              "Validate routing rules"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentEntryAPI",
+                "label": "receive request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ContentQualityValidator",
+                "label": "send for validation"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-002"
+          ]
+        },
+        {
+          "masterCount": 55,
+          "processOrder": "0.25",
+          "id": "SCAI-Prod-Core-ContentQualityValidator",
+          "name": "Content Quality Validator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Profanity and content quality validation with external API callbacks",
+            "description": "Validates all incoming content generation requests against a comprehensive profanity filter (420+ banned words). Rejects requests containing inappropriate keywords before processing begins. Sends validation results to external systems via webhook callbacks for audit and compliance tracking",
+            "capabilities": [
+              "Check keywords against 420+ banned words list",
+              "Detect profanity and inappropriate content",
+              "Reject inappropriate requests",
+              "Log flagged content",
+              "Return validation errors to user",
+              "Validation API callback",
+              "Webhook notifications for validation events",
+              "External system integration for compliance"
+            ],
+            "integrations": [
+              "External validation webhook APIs",
+              "Compliance tracking systems"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-RequestRouter",
+                "label": "validate request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ManualEntryHandler",
+                "label": "validated manual request"
+              },
+              {
+                "target": "SCAI-Prod-Core-AutoPopulationHandler",
+                "label": "validated auto request"
+              },
+              {
+                "target": "SCAI-Prod-Comm-ValidationCallbackService",
+                "label": "send validation result"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-052"
+          ]
+        },
+        {
+          "masterCount": 57,
+          "processOrder": "0.26",
+          "id": "SCAI-Prod-Comm-ValidationCallbackService",
+          "name": "Validation Callback Service",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 3,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Send validation results to external systems via webhook callbacks",
+            "description": "Sends profanity filter and content quality validation results to external compliance and audit systems via HTTP webhooks. Enables integration with third-party content moderation platforms and internal audit tools for tracking validation events",
+            "capabilities": [
+              "Send webhook callbacks for validation events",
+              "Retry logic for failed callbacks",
+              "Configurable webhook endpoints",
+              "Payload encryption for sensitive data",
+              "Audit trail for callback attempts",
+              "Support for multiple callback destinations"
+            ],
+            "integrations": [
+              "External compliance systems",
+              "Audit tracking platforms",
+              "Content moderation APIs"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentQualityValidator",
+                "label": "validation result"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-054"
+          ],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 3,
+          "processOrder": "0.3",
+          "id": "SCAI-Prod-Core-ManualEntryHandler",
+          "name": "Manual Entry Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Process manual keyword entry",
+            "description": "Handles single keyword manual entry requests from Content Generation Tab UI. Validates input and initiates content generation workflow",
+            "capabilities": [
+              "Validate manual keyword input",
+              "Create generation job",
+              "Route to cluster formation"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentQualityValidator",
+                "label": "validated manual request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-AutoClusterOrchestrator",
+                "label": "initiate phase 1"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-003"
+          ]
+        },
+        {
+          "masterCount": 4,
+          "processOrder": "0.4",
+          "id": "SCAI-Prod-Core-AutoPopulationHandler",
+          "name": "Auto Population Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Process auto-population requests with history tracking",
+            "description": "Handles bulk generation, preview, and deploy requests. Processes multiple keywords and initiates batch workflow. Stores complete user request history to S3 for auditing and debugging purposes",
+            "capabilities": [
+              "Process bulk keywords",
+              "Handle preview mode",
+              "Handle deploy mode",
+              "Batch job creation",
+              "Inflection processing (singular/plural generation)",
+              "User input history tracking",
+              "Store full request payload to S3",
+              "Timestamp and user attribution"
+            ],
+            "integrations": [
+              "Python inflection library",
+              "S3 (Tools/Article Generation/{email}/{user_id}.json)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentQualityValidator",
+                "label": "validated auto request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-AutoClusterOrchestrator",
+                "label": "initiate phase 1"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-004"
+          ]
+        },
+        {
+          "masterCount": 5,
+          "processOrder": "1.0",
+          "id": "SCAI-Prod-Core-AutoClusterOrchestrator",
+          "name": "Auto Cluster Orchestrator",
+          "type": "stepfunctions",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Orchestrate multi-cluster workflow with Primary/Secondary/Tertiary article count handling",
+            "description": "Coordinates the cluster formation process including keyword expansion, scoring, cost estimation, and queueing for review. Implements intelligent cluster logic: PRIMARY = 1 seed keyword → 1 comprehensive article (cornerstone content), SECONDARIES = 15-100+ related keywords → scalable article count, TERTIARY = AI-suggested keywords managed programmatically (optional, prevents UI overload)",
+            "capabilities": [
+              "Coordinate cluster workflow",
+              "Manage workflow state",
+              "Handle error recovery",
+              "PRIMARY CLUSTER LOGIC: 1 seed keyword = 1 article (high-value cornerstone content)",
+              "SECONDARY CLUSTER LOGIC: N related keywords = N articles (15-100+ scalable)",
+              "TERTIARY CLUSTER LOGIC: AI-generated keywords (programmatic, optional based on budget)",
+              "UI protection: Display only approved Primary + Secondary keywords",
+              "Tertiary keywords managed in background (prevents UI overload)"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ManualEntryHandler",
+                "label": "initiate"
+              },
+              {
+                "source": "SCAI-Prod-Core-AutoPopulationHandler",
+                "label": "initiate"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "expand keywords"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-005"
+          ]
+        },
+        {
+          "masterCount": 6,
+          "processOrder": "1.1",
+          "id": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+          "name": "Keyword Expansion Engine",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "AI-powered keyword expansion using DataForSEO with question validation",
+            "description": "Uses AI to expand seed keywords into clusters with related terms, synonyms, and variations. Includes AI-powered question validation to check if keywords are informative questions before processing. Queries DataForSEO for search volume, competition, and intent signals",
+            "capabilities": [
+              "Expand keywords using AI",
+              "AI-powered question validation (GPT-4-turbo)",
+              "Validate if keyword is an informative question",
+              "Query DataForSEO API",
+              "Cluster related keywords",
+              "Extract intent signals"
+            ],
+            "integrations": [
+              "DataForSEO API",
+              "OpenAI API (GPT-4-turbo)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-AutoClusterOrchestrator",
+                "label": "expand"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "DataForSEO API",
+                "label": "query metrics"
+              },
+              {
+                "target": "SCAI-Prod-Core-ClusterScoringEngine",
+                "label": "score clusters"
+              },
+              {
+                "target": "SCAI-Prod-Data-KeywordClusterTable",
+                "label": "store clusters"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-006",
+            "CG-014"
+          ]
+        },
+        {
+          "masterCount": 7,
+          "processOrder": "1.2",
+          "id": "SCAI-Prod-Core-ClusterScoringEngine",
+          "name": "Cluster Scoring Engine",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Score and rank keyword clusters",
+            "description": "Analyzes keyword clusters and assigns scores based on search volume, competition, commercial intent, and relevance",
+            "capabilities": [
+              "Calculate cluster scores",
+              "Rank by priority",
+              "Assess commercial value",
+              "Identify best opportunities"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "receive clusters"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-CostEstimator",
+                "label": "estimate costs"
+              },
+              {
+                "target": "SCAI-Prod-Data-SEOMetricsTable",
+                "label": "store scores"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-007"
+          ]
+        },
+        {
+          "masterCount": 8,
+          "processOrder": "1.3",
+          "id": "SCAI-Prod-Core-CostEstimator",
+          "name": "Cost Estimator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Estimate generation costs for clusters",
+            "description": "Calculates estimated costs for generating content based on keyword count, article types, and API usage",
+            "capabilities": [
+              "Calculate API costs",
+              "Estimate generation time",
+              "Budget validation",
+              "Cost breakdown"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ClusterScoringEngine",
+                "label": "receive scores"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ToClusterReviewQueue",
+                "label": "queue for review"
+              },
+              {
+                "target": "SCAI-Prod-Data-BudgetTable",
+                "label": "store estimates"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-008"
+          ]
+        },
+        {
+          "masterCount": 9,
+          "processOrder": "1.4",
+          "id": "SCAI-Prod-Core-ToClusterReviewQueue",
+          "name": "To Cluster Review Queue",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Queue clusters for user review",
+            "description": "Places scored and costed clusters into review queue for user approval",
+            "capabilities": [
+              "Queue management",
+              "Priority ordering",
+              "Notification trigger"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-CostEstimator",
+                "label": "queue"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Comm-UserNotificationService",
+                "label": "notify user"
+              },
+              {
+                "target": "SCAI-Prod-Core-ClusterReviewAPI",
+                "label": "pending review"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-009"
+          ]
+        },
+        {
+          "masterCount": 10,
+          "processOrder": "1.5",
+          "id": "SCAI-Prod-Core-ClusterReviewAPI",
+          "name": "Cluster Review API",
+          "type": "apigateway",
+          "category": "api",
+          "layer": 1,
+          "metadata": {
+            "type": "API Gateway",
+            "purpose": "User interface for cluster review and approval",
+            "description": "Provides REST endpoints for users to review, edit, and approve keyword clusters before generation",
+            "capabilities": [
+              "Display cluster details",
+              "Edit keywords",
+              "Approve/reject clusters",
+              "Modify budgets"
+            ],
+            "integrations": [
+              "Cluster Review UI"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "User Interface",
+                "label": "review requests"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ClusterApprovalHandler",
+                "label": "submit approval"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-010"
+          ]
+        },
+        {
+          "masterCount": 11,
+          "processOrder": "1.6",
+          "id": "SCAI-Prod-Core-ClusterApprovalHandler",
+          "name": "Cluster Approval Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Process cluster approval decisions",
+            "description": "Handles user approval of keyword clusters and initiates article type assignment phase",
+            "capabilities": [
+              "Process approvals",
+              "Update cluster status",
+              "Trigger next phase",
+              "Handle rejections"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ClusterReviewAPI",
+                "label": "approval decision"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ArticleTypeAssigner",
+                "label": "initiate phase 2"
+              },
+              {
+                "target": "SCAI-Prod-Data-KeywordClusterTable",
+                "label": "update status"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-011"
+          ]
+        },
+        {
+          "masterCount": 12,
+          "processOrder": "1.7",
+          "id": "SCAI-Prod-Data-KeywordClusterTable",
+          "name": "Keyword Cluster Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Store keyword clusters and expansion results",
+            "description": "Stores keyword clusters with expanded terms, scores, and approval status",
+            "capabilities": [
+              "Store cluster data",
+              "Track approval status",
+              "Query by project",
+              "Version tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "write"
+              },
+              {
+                "source": "SCAI-Prod-Core-ClusterApprovalHandler",
+                "label": "update"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-042"
+          ]
+        },
+        {
+          "masterCount": 13,
+          "processOrder": "1.8",
+          "id": "SCAI-Prod-Data-SEOMetricsTable",
+          "name": "SEO Metrics Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Store DataForSEO metrics and scores",
+            "description": "Stores SEO metrics including search volume, competition, CPC, and intent signals from DataForSEO",
+            "capabilities": [
+              "Store SEO metrics",
+              "Cache DataForSEO results",
+              "Query by keyword",
+              "Historical tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ClusterScoringEngine",
+                "label": "write"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-043"
+          ]
+        },
+        {
+          "masterCount": 14,
+          "processOrder": "1.9",
+          "id": "SCAI-Prod-Data-LocationModifierTable",
+          "name": "Location Modifier Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Store location-based keyword modifiers",
+            "description": "Stores location modifiers for local SEO keywords (cities, states, regions)",
+            "capabilities": [
+              "Store location data",
+              "Support local keywords",
+              "Geographic targeting"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "read locations"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-044"
+          ]
+        },
+        {
+          "masterCount": 15,
+          "processOrder": "1.10",
+          "id": "SCAI-Prod-Data-BudgetTable",
+          "name": "Budget Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Track budget and cost estimates",
+            "description": "Stores budget allocations, cost estimates, and actual spending per project",
+            "capabilities": [
+              "Budget tracking",
+              "Cost estimation",
+              "Spending limits",
+              "Alert thresholds"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-CostEstimator",
+                "label": "write estimates"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-045"
+          ]
+        },
+        {
+          "masterCount": 16,
+          "processOrder": "1.11",
+          "id": "SCAI-Prod-Security-APIQuotaMonitor",
+          "name": "API Quota Monitor",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Monitor API usage and enforce quotas",
+            "description": "Tracks API usage across DataForSEO, OpenAI, and FAL APIs. Enforces rate limits and quotas",
+            "capabilities": [
+              "Track API usage",
+              "Enforce rate limits",
+              "Quota management",
+              "Usage alerts"
+            ],
+            "integrations": [
+              "DataForSEO API",
+              "OpenAI API",
+              "FAL Flux API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "check quota"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Security-BudgetManager",
+                "label": "budget check"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-039"
+          ]
+        },
+        {
+          "masterCount": 17,
+          "processOrder": "1.12",
+          "id": "SCAI-Prod-Security-BudgetManager",
+          "name": "Budget Manager",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Manage budget allocations and limits",
+            "description": "Controls budget allocation, spending limits, and cost tracking across all phases",
+            "capabilities": [
+              "Budget allocation",
+              "Spending limits",
+              "Cost tracking",
+              "Alert on overages"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Security-APIQuotaMonitor",
+                "label": "budget check"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Data-BudgetTable",
+                "label": "read/write budget"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-040"
+          ]
+        },
+        {
+          "masterCount": 18,
+          "processOrder": "1.13",
+          "id": "SCAI-Prod-Security-DataForSEOClient",
+          "name": "DataForSEO Client",
+          "type": "secretsmanager",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Secure wrapper for DataForSEO API calls",
+            "description": "Manages authentication and secure API calls to DataForSEO with credential rotation",
+            "capabilities": [
+              "API authentication",
+              "Secure API calls",
+              "Credential management",
+              "Error handling"
+            ],
+            "integrations": [
+              "DataForSEO API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-KeywordExpansionEngine",
+                "label": "API request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "DataForSEO API",
+                "label": "query"
+              },
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "get credentials"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-035"
+          ]
+        },
+        {
+          "masterCount": 19,
+          "processOrder": "1.14",
+          "id": "SCAI-Prod-Comm-UserNotificationService",
+          "name": "User Notification Service",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 3,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Send notifications to users",
+            "description": "Sends notifications about cluster review, generation progress, and completion status",
+            "capabilities": [
+              "Email notifications",
+              "In-app notifications",
+              "WebSocket messages",
+              "Status updates"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ToClusterReviewQueue",
+                "label": "notify"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "User Interface",
+                "label": "send notification"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-026"
+          ]
+        },
+        {
+          "masterCount": 20,
+          "processOrder": "1.15",
+          "id": "SCAI-Prod-Comm-BulkQueueManager",
+          "name": "Bulk Queue Manager",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 3,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Manage bulk generation queues",
+            "description": "Manages queues for bulk content generation, prioritization, and batch processing",
+            "capabilities": [
+              "Queue management",
+              "Priority scheduling",
+              "Batch coordination",
+              "Progress tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-AutoPopulationHandler",
+                "label": "queue bulk jobs"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-AutoClusterOrchestrator",
+                "label": "process batch"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-030"
+          ]
+        },
+        {
+          "masterCount": 21,
+          "processOrder": "2.0",
+          "id": "SCAI-Prod-Core-ArticleTypeAssigner",
+          "name": "Article Type Assigner",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Assign article types based on keyword intent with Local SEO support",
+            "description": "Analyzes keyword intent signals and assigns appropriate article types (informational, commercial, local, how-to, comparison, review, listicle, affiliate, recipe). Includes Business NAP (Name, Address, Phone) support, SEO contact information capabilities, and local linking strategies for enhanced Local article type detection",
+            "capabilities": [
+              "Intent analysis",
+              "Article type detection",
+              "Type assignment",
+              "Confidence scoring",
+              "Business NAP (Name, Address, Phone) support for Local articles",
+              "SEO contact information capability",
+              "Local linking strategies (city pages, service area pages)",
+              "Enhanced Local article type detection",
+              "Geographic targeting and location modifiers"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ClusterApprovalHandler",
+                "label": "approved clusters"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-GenerationJobCreator",
+                "label": "create jobs"
+              },
+              {
+                "target": "SCAI-Prod-Data-ArticleMetadataTable",
+                "label": "store type"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-012"
+          ]
+        },
+        {
+          "masterCount": 22,
+          "processOrder": "2.1",
+          "id": "SCAI-Prod-Core-GenerationJobCreator",
+          "name": "Generation Job Creator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Create generation jobs for approved keywords",
+            "description": "Creates individual generation jobs with article type, keyword, and metadata for AI generation phase",
+            "capabilities": [
+              "Job creation",
+              "Metadata assembly",
+              "Queue preparation",
+              "Job tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ArticleTypeAssigner",
+                "label": "receive assignments"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ToAIGenerationQueue",
+                "label": "queue jobs"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-013"
+          ]
+        },
+        {
+          "masterCount": 23,
+          "processOrder": "2.2",
+          "id": "SCAI-Prod-Core-ToAIGenerationQueue",
+          "name": "To AI Generation Queue",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Queue jobs for AI content generation",
+            "description": "Places generation jobs into AI generation queue for processing by unified content engine",
+            "capabilities": [
+              "Queue management",
+              "Job prioritization",
+              "Rate limiting",
+              "Status tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-GenerationJobCreator",
+                "label": "queue"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-PromptConfigurator",
+                "label": "initiate phase 3"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-013"
+          ]
+        },
+        {
+          "masterCount": 24,
+          "processOrder": "3.0",
+          "id": "SCAI-Prod-Orchestration-PromptConfigurator",
+          "name": "Prompt Configurator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Configure prompts for article generation",
+            "description": "Loads article type-specific prompt templates and configures them with keyword, context, and component placement rules",
+            "capabilities": [
+              "Load prompt templates",
+              "Configure placeholders",
+              "Inject context",
+              "Component rules"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ToAIGenerationQueue",
+                "label": "receive job"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "generate content"
+              },
+              {
+                "target": "SCAI-Prod-Data-PromptTemplateStore",
+                "label": "load templates"
+              },
+              {
+                "target": "SCAI-Prod-Data-UserContextStore",
+                "label": "read context"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-015"
+          ]
+        },
+        {
+          "masterCount": 25,
+          "processOrder": "3.1",
+          "id": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+          "name": "Unified Content Engine",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "AI-powered content generation using GPT-4-turbo",
+            "description": "Unified engine that generates articles using OpenAI GPT-4-turbo with type-specific structures and component placement",
+            "capabilities": [
+              "AI content generation",
+              "Type-specific structures",
+              "Component placement",
+              "Quality control"
+            ],
+            "integrations": [
+              "OpenAI API (GPT-4-turbo)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-PromptConfigurator",
+                "label": "configured prompt"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "OpenAI API (GPT-4-turbo)",
+                "label": "generate"
+              },
+              {
+                "target": "SCAI-Prod-Security-OpenAIClient",
+                "label": "API call"
+              },
+              {
+                "target": "SCAI-Prod-Data-RawArticleStore",
+                "label": "store article"
+              },
+              {
+                "target": "SCAI-Prod-Comm-StatusUpdateHandler",
+                "label": "update status"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-014",
+            "CG-016"
+          ]
+        },
+        {
+          "masterCount": 26,
+          "processOrder": "3.2",
+          "id": "SCAI-Prod-Security-OpenAIClient",
+          "name": "OpenAI Client",
+          "type": "secretsmanager",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Secure wrapper for OpenAI API calls",
+            "description": "Manages authentication and secure API calls to OpenAI with credential rotation and error handling",
+            "capabilities": [
+              "API authentication",
+              "Secure API calls",
+              "Credential management",
+              "Rate limiting",
+              "Error handling"
+            ],
+            "integrations": [
+              "OpenAI API (GPT-4-turbo)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "API request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "OpenAI API (GPT-4-turbo)",
+                "label": "query"
+              },
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "get credentials"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-036"
+          ]
+        },
+        {
+          "masterCount": 27,
+          "processOrder": "3.3",
+          "id": "scai-prod-prompttemplates-{AccountId}",
+          "name": "Prompt Template Store",
+          "type": "s3",
+          "category": "storage",
+          "layer": 6,
+          "metadata": {
+            "type": "S3 Bucket",
+            "purpose": "Store article type-specific prompt templates",
+            "description": "Stores prompt templates for each article type with structure and component placement rules",
+            "capabilities": [
+              "Template storage",
+              "Version control",
+              "Type categorization",
+              "Quick retrieval"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-PromptConfigurator",
+                "label": "read"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-047"
+          ]
+        },
+        {
+          "masterCount": 28,
+          "processOrder": "3.4",
+          "id": "scai-prod-rawarticle-{AccountId}",
+          "name": "Raw Article Store",
+          "type": "s3",
+          "category": "storage",
+          "layer": 6,
+          "metadata": {
+            "type": "S3 Bucket",
+            "purpose": "Store raw generated articles",
+            "description": "Stores raw article content from AI generation before post-processing",
+            "capabilities": [
+              "Article storage",
+              "Version tracking",
+              "Fast retrieval",
+              "Backup retention"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "write"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-048"
+          ]
+        },
+        {
+          "masterCount": 29,
+          "processOrder": "3.5",
+          "id": "SCAI-Prod-Data-ArticleMetadataTable",
+          "name": "Article Metadata Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Track article metadata and status",
+            "description": "Stores article metadata including type, keyword, generation status, word count, and deployment status",
+            "capabilities": [
+              "Metadata tracking",
+              "Status management",
+              "Query by project",
+              "Deployment tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ArticleTypeAssigner",
+                "label": "store type"
+              },
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "update metadata"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-046"
+          ]
+        },
+        {
+          "masterCount": 30,
+          "processOrder": "3.6",
+          "id": "SCAI-Prod-Data-UserContextStore",
+          "name": "User Context Store",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Store user preferences and context",
+            "description": "Stores user settings, brand voice, writing style, and preferences for content generation",
+            "capabilities": [
+              "User preferences",
+              "Brand voice",
+              "Writing style",
+              "Context retrieval"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-PromptConfigurator",
+                "label": "read"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-042"
+          ]
+        },
+        {
+          "masterCount": 31,
+          "processOrder": "3.7",
+          "id": "SCAI-Prod-Comm-WebSocketAPI",
+          "name": "WebSocket API",
+          "type": "apigateway",
+          "category": "network",
+          "layer": 3,
+          "metadata": {
+            "type": "API Gateway (WebSocket)",
+            "purpose": "Real-time bidirectional communication",
+            "description": "Provides real-time updates during content generation for progress tracking and status updates",
+            "capabilities": [
+              "Connection management",
+              "Real-time messaging",
+              "Progress streaming",
+              "Status updates"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "User Interface",
+                "label": "connect"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Comm-StatusUpdateHandler",
+                "label": "invoke"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-027"
+          ]
+        },
+        {
+          "masterCount": 32,
+          "processOrder": "3.8",
+          "id": "SCAI-Prod-Comm-StatusUpdateHandler",
+          "name": "Status Update Handler",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 3,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Handle real-time status updates",
+            "description": "Manages WebSocket connections and broadcasts status updates during content generation",
+            "capabilities": [
+              "Connection management",
+              "Status broadcasting",
+              "Progress updates",
+              "Error notifications"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "status update"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Comm-WebSocketAPI",
+                "label": "broadcast"
+              },
+              {
+                "target": "SCAI-Prod-Comm-ProgressNotifier",
+                "label": "notify"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-028"
+          ]
+        },
+        {
+          "masterCount": 33,
+          "processOrder": "3.9",
+          "id": "SCAI-Prod-Comm-ProgressNotifier",
+          "name": "Progress Notifier",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 3,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Send progress notifications",
+            "description": "Sends progress notifications for bulk generation and long-running operations",
+            "capabilities": [
+              "Progress tracking",
+              "Percentage calculations",
+              "ETA estimation",
+              "Completion alerts"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Comm-StatusUpdateHandler",
+                "label": "progress update"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "User Interface",
+                "label": "send notification"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-029"
+          ]
+        },
+        {
+          "masterCount": 34,
+          "processOrder": "3.95",
+          "id": "SCAI-Prod-Comm-ContentGenerationTopic",
+          "name": "Content Generation Events",
+          "type": "sns",
+          "category": "messaging",
+          "layer": 7,
+          "metadata": {
+            "type": "SNS Topic",
+            "purpose": "Decouple content generation events",
+            "description": "Fan-out pattern for content generation completion events to multiple subscribers",
+            "capabilities": [
+              "Event fan-out",
+              "Multiple subscriber support",
+              "DLQ support"
+            ],
+            "integrations": [
+              "Lambda subscribers"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "publish completion"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ArticleAssemblyOrchestrator",
+                "label": "notify subscribers"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 35,
+          "processOrder": "4.0",
+          "id": "SCAI-Prod-Core-ArticleAssemblyOrchestrator",
+          "name": "Article Assembly Orchestrator",
+          "type": "stepfunctions",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Orchestrate article post-processing workflow",
+            "description": "Coordinates the article assembly process including keyword filtering, heading generation, paragraph expansion, product insertion, image generation, and internal linking",
+            "capabilities": [
+              "Workflow coordination",
+              "Step sequencing",
+              "Error handling",
+              "State management"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-UnifiedContentEngine",
+                "label": "raw article"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-KeywordFilter",
+                "label": "filter keywords"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-017"
+          ]
+        },
+        {
+          "masterCount": 35,
+          "processOrder": "4.1",
+          "id": "SCAI-Prod-Deploy-KeywordFilter",
+          "name": "Keyword Filter",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Filter and optimize keyword usage",
+            "description": "Analyzes keyword density and optimizes keyword placement for SEO",
+            "capabilities": [
+              "Keyword density analysis",
+              "Placement optimization",
+              "Over-optimization detection",
+              "Natural language flow"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ArticleAssemblyOrchestrator",
+                "label": "filter"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-HeadingGenerator",
+                "label": "next step"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-018"
+          ]
+        },
+        {
+          "masterCount": 36,
+          "processOrder": "4.2",
+          "id": "SCAI-Prod-Deploy-HeadingGenerator",
+          "name": "Heading Generator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Generate SEO-optimized headings",
+            "description": "Creates H2, H3 headings with keyword optimization and natural structure",
+            "capabilities": [
+              "Heading generation",
+              "Keyword inclusion",
+              "Hierarchy optimization",
+              "Readability scoring"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-KeywordFilter",
+                "label": "filtered content"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-ParagraphGenerator",
+                "label": "next step"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-019"
+          ]
+        },
+        {
+          "masterCount": 37,
+          "processOrder": "4.3",
+          "id": "SCAI-Prod-Orchestration-ParagraphGenerator",
+          "name": "Paragraph Generator",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Expand paragraphs with additional content",
+            "description": "Uses AI to expand thin paragraphs and add supporting details while maintaining context",
+            "capabilities": [
+              "Paragraph expansion",
+              "Context preservation",
+              "Detail enhancement",
+              "Flow optimization"
+            ],
+            "integrations": [
+              "OpenAI API (GPT-4-turbo)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-HeadingGenerator",
+                "label": "with headings"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-ProductInserter",
+                "label": "next step"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-020"
+          ]
+        },
+        {
+          "masterCount": 38,
+          "processOrder": "4.4",
+          "id": "SCAI-Prod-Deploy-ProductInserter",
+          "name": "Product Inserter",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Insert affiliate products and links",
+            "description": "Identifies product placement opportunities and inserts Amazon affiliate products with natural integration",
+            "capabilities": [
+              "Product placement",
+              "Amazon API integration",
+              "Relevance matching",
+              "Natural insertion"
+            ],
+            "integrations": [
+              "Amazon Product API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-ParagraphGenerator",
+                "label": "expanded content"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-ImageGenerationEngine",
+                "label": "next step"
+              },
+              {
+                "target": "SCAI-Prod-Security-AmazonProductAPIClient",
+                "label": "get products"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-021"
+          ]
+        },
+        {
+          "masterCount": 39,
+          "processOrder": "4.5",
+          "id": "SCAI-Prod-Orchestration-ImageGenerationEngine",
+          "name": "Image Generation Engine",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Generate AI images using Flux, Leap AI (Stable Diffusion), and DALL-E 3",
+            "description": "Generates featured images and supporting visuals using multiple AI image generation APIs (FAL Flux Pro 1.1, Leap AI with Stable Diffusion, DALL-E 3). Creates contextually relevant images based on article content with model selection based on user preference",
+            "capabilities": [
+              "Image prompt creation",
+              "FAL Flux API integration",
+              "Leap AI API integration (Stable Diffusion models)",
+              "DALL-E 3 API integration",
+              "Model selection based on user preference",
+              "Image optimization",
+              "CDN upload",
+              "Rate-limited execution for all image APIs"
+            ],
+            "integrations": [
+              "FAL Flux API (flux-pro-1.1)",
+              "Leap AI API (Stable Diffusion)",
+              "OpenAI DALL-E 3 API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-ProductInserter",
+                "label": "with products"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "FAL Flux API (flux-pro-1.1)",
+                "label": "generate"
+              },
+              {
+                "target": "SCAI-Prod-Orchestration-ImageFilterService",
+                "label": "validate images"
+              },
+              {
+                "target": "SCAI-Prod-Data-ImageStore",
+                "label": "store images"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-025"
+          ]
+        },
+        {
+          "masterCount": 56,
+          "processOrder": "4.55",
+          "id": "SCAI-Prod-Orchestration-ImageFilterService",
+          "name": "Image Filter Service",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 2,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Filter inappropriate images using AWS Rekognition",
+            "description": "Validates generated images using AWS Rekognition to detect unwanted objects/content. Implements retry logic with up to 5 regeneration attempts if inappropriate content is detected",
+            "capabilities": [
+              "AWS Rekognition label detection",
+              "Unwanted object detection",
+              "Retry logic (up to 5 attempts)",
+              "Image regeneration trigger",
+              "Content approval validation"
+            ],
+            "integrations": [
+              "AWS Rekognition API",
+              "FAL Flux API (via SCAI-Prod-Orchestration-ImageGenerationEngine)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-ImageGenerationEngine",
+                "label": "generated images"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Orchestration-ImageGenerationEngine",
+                "label": "regenerate if rejected"
+              },
+              {
+                "target": "SCAI-Prod-Deploy-InternalLinker",
+                "label": "filtered images"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-053"
+          ]
+        },
+        {
+          "masterCount": 40,
+          "processOrder": "4.6",
+          "id": "SCAI-Prod-Deploy-InternalLinker",
+          "name": "Internal Linker",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Create internal linking structure with content formatting",
+            "description": "Analyzes content using AI keyword extraction (text-curie-001) and creates relevant internal links between articles. Implements Primary→Secondary linking and sequential circular linking for optimal SEO and user navigation. Includes split300() formatting to improve content readability",
+            "capabilities": [
+              "Link opportunity detection",
+              "Relevance matching",
+              "Anchor text generation",
+              "Link graph management",
+              "AI keyword extraction (text-curie-001)",
+              "Primary→Secondary linking",
+              "Sequential circular linking",
+              "Hyperlink insertion at first occurrence",
+              "split300() content formatting",
+              "Insert paragraph breaks (<br><br>) at 300-char intervals",
+              "Find nearest fullstop for natural breaks"
+            ],
+            "integrations": [
+              "OpenAI API (via SCAI-Prod-Security-OpenAIClient)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-ImageFilterService",
+                "label": "with filtered images"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-DuplicationChecker",
+                "label": "next step"
+              },
+              {
+                "target": "SCAI-Prod-Data-LinkGraphTable",
+                "label": "update graph"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-022"
+          ]
+        },
+        {
+          "masterCount": 41,
+          "processOrder": "4.7",
+          "id": "SCAI-Prod-Deploy-DuplicationChecker",
+          "name": "Duplication Checker",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Check for content duplication",
+            "description": "Scans content for duplicate phrases using sentence-level deduplication and set-based tracking. Triggers AI regeneration (GPT-4-turbo) for any duplicates found to ensure uniqueness across all generated articles",
+            "capabilities": [
+              "Duplication detection",
+              "Similarity scoring",
+              "Uniqueness validation",
+              "Sentence-level deduplication",
+              "Set-based tracking",
+              "AI regeneration (GPT-4-turbo)",
+              "Regenerate questions/answers/metadata",
+              "Rewrite suggestions"
+            ],
+            "integrations": [
+              "OpenAI API (via SCAI-Prod-Security-OpenAIClient)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-InternalLinker",
+                "label": "with links"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Core-ToDeploymentQueue",
+                "label": "initiate phase 5"
+              },
+              {
+                "target": "SCAI-Prod-Data-EnhancedArticleStore",
+                "label": "store final article"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-023"
+          ]
+        },
+        {
+          "masterCount": 42,
+          "processOrder": "4.8",
+          "id": "SCAI-Prod-Data-ArticleAssemblyTable",
+          "name": "Article Assembly Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Track article assembly workflow state",
+            "description": "Stores assembly workflow state, step completion, and processing status for each article",
+            "capabilities": [
+              "Workflow state tracking",
+              "Step completion",
+              "Error logging",
+              "Retry management"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ArticleAssemblyOrchestrator",
+                "label": "track state"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-049"
+          ]
+        },
+        {
+          "masterCount": 43,
+          "processOrder": "4.9",
+          "id": "scai-prod-enhancedarticle-{AccountId}",
+          "name": "Enhanced Article Store",
+          "type": "s3",
+          "category": "storage",
+          "layer": 6,
+          "metadata": {
+            "type": "S3 Bucket",
+            "purpose": "Store final enhanced articles",
+            "description": "Stores final enhanced articles after all post-processing steps are complete",
+            "capabilities": [
+              "Article storage",
+              "Version control",
+              "Fast retrieval",
+              "CDN integration"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-DuplicationChecker",
+                "label": "write"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-050"
+          ]
+        },
+        {
+          "masterCount": 44,
+          "processOrder": "4.10",
+          "id": "scai-prod-images-{AccountId}",
+          "name": "Image Store",
+          "type": "s3",
+          "category": "storage",
+          "layer": 6,
+          "metadata": {
+            "type": "S3 Bucket",
+            "purpose": "Store generated images",
+            "description": "Stores AI-generated images with CDN delivery for WordPress deployment",
+            "capabilities": [
+              "Image storage",
+              "CDN distribution",
+              "Optimization",
+              "Fast delivery"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Orchestration-ImageGenerationEngine",
+                "label": "write"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-051"
+          ]
+        },
+        {
+          "masterCount": 45,
+          "processOrder": "4.11",
+          "id": "SCAI-Prod-Data-LinkGraphTable",
+          "name": "Link Graph Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Manage internal linking relationships",
+            "description": "Stores internal link graph for SEO and navigation optimization",
+            "capabilities": [
+              "Link tracking",
+              "Graph management",
+              "Relationship mapping",
+              "Query by article"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-InternalLinker",
+                "label": "update"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-046"
+          ]
+        },
+        {
+          "masterCount": 46,
+          "processOrder": "4.12",
+          "id": "SCAI-Prod-Security-AmazonProductAPIClient",
+          "name": "Amazon Product API Client",
+          "type": "secretsmanager",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Secure wrapper for Amazon Product API",
+            "description": "Manages authentication and API calls to Amazon Product Advertising API for affiliate products",
+            "capabilities": [
+              "API authentication",
+              "Product search",
+              "Price retrieval",
+              "Affiliate link generation"
+            ],
+            "integrations": [
+              "Amazon Product API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-ProductInserter",
+                "label": "get products"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "get credentials"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-037"
+          ]
+        },
+        {
+          "masterCount": 47,
+          "processOrder": "5.0",
+          "id": "SCAI-Prod-Core-ToDeploymentQueue",
+          "name": "To Deployment Queue",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 1,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Queue articles for WordPress deployment",
+            "description": "Places completed articles into deployment queue for WordPress publishing",
+            "capabilities": [
+              "Queue management",
+              "Deployment scheduling",
+              "Priority handling",
+              "Status tracking"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-DuplicationChecker",
+                "label": "queue"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-DeploymentOrchestrator",
+                "label": "initiate deployment"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-024"
+          ]
+        },
+        {
+          "masterCount": 48,
+          "processOrder": "5.1",
+          "id": "SCAI-Prod-Deploy-DeploymentOrchestrator",
+          "name": "Deployment Orchestrator",
+          "type": "stepfunctions",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Orchestrate WordPress deployment workflow",
+            "description": "Coordinates plugin installation and content deployment to WordPress sites via Cloudways",
+            "capabilities": [
+              "Deployment coordination",
+              "Plugin verification",
+              "Workflow management",
+              "Error handling"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ToDeploymentQueue",
+                "label": "receive job"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Deploy-PluginInstaller",
+                "label": "install plugin"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-031"
+          ]
+        },
+        {
+          "masterCount": 49,
+          "processOrder": "5.2",
+          "id": "SCAI-Prod-Deploy-PluginInstaller",
+          "name": "Plugin Installer",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Install SCAI WordPress plugin",
+            "description": "Automatically installs and configures SCAI WordPress plugin on target sites if not already present",
+            "capabilities": [
+              "Plugin installation",
+              "Plugin verification",
+              "Configuration setup",
+              "Activation"
+            ],
+            "integrations": [
+              "Cloudways API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-DeploymentOrchestrator",
+                "label": "install"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "Cloudways API",
+                "label": "install plugin"
+              },
+              {
+                "target": "SCAI-Prod-Deploy-WordPressDeployer",
+                "label": "next step"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-032"
+          ]
+        },
+        {
+          "masterCount": 50,
+          "processOrder": "5.3",
+          "id": "SCAI-Prod-Deploy-WordPressDeployer",
+          "name": "WordPress Deployer",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 4,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Deploy content to WordPress sites with AI-powered taxonomy and optimization",
+            "description": "Publishes enhanced articles to WordPress using REST API with AI-powered category and tag assignment. Handles authentication, media upload, post creation, taxonomy assignment, image reuse optimization, and duplicate post detection. Supports parallel cluster processing with reserved concurrency (max 5 concurrent deployments) to prevent overwhelming WordPress API",
+            "capabilities": [
+              "Authenticate with WordPress REST API",
+              "Upload media files",
+              "Create/update posts",
+              "AI category assignment (GPT-4-turbo)",
+              "AI tag generation (4 tags per post)",
+              "Auto-create categories/tags if missing",
+              "Image reuse optimization (check existing media)",
+              "Duplicate post detection and handling",
+              "Parallel cluster processing",
+              "Cluster divider (split by Primary/Secondary state)",
+              "Set post metadata",
+              "Handle deployment errors",
+              "Rate-limited execution",
+              "Retry logic (2 attempts)",
+              "URL structure configuration",
+              "Image CDN setup",
+              "SEO metadata",
+              "Post scheduling"
+            ],
+            "integrations": [
+              "WordPress Sites",
+              "WordPress REST API (via shared client)",
+              "Cloudways API",
+              "OpenAI API (via SCAI-Prod-Security-OpenAIClient)"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-PluginInstaller",
+                "label": "deploy"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "WordPress Sites",
+                "label": "publish"
+              },
+              {
+                "target": "SCAI-Prod-Security-CloudwaysAPIClient",
+                "label": "API call"
+              },
+              {
+                "target": "SCAI-Prod-Data-ProjectArticlesTable",
+                "label": "update status"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-033",
+            "CG-034"
+          ]
+        },
+        {
+          "masterCount": 51,
+          "processOrder": "5.4",
+          "id": "SCAI-Prod-Security-CloudwaysAPIClient",
+          "name": "Cloudways API Client",
+          "type": "secretsmanager",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Secure wrapper for Cloudways API",
+            "description": "Manages authentication and API calls to Cloudways for WordPress site management",
+            "capabilities": [
+              "API authentication",
+              "Site management",
+              "Plugin installation",
+              "Credential rotation"
+            ],
+            "integrations": [
+              "Cloudways API"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-WordPressDeployer",
+                "label": "API request"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "Cloudways API",
+                "label": "query"
+              },
+              {
+                "target": "SCAI-Prod-Security-SecretsManager",
+                "label": "get credentials"
+              }
+            ]
+          },
+          "requirements": [
+            "CG-038"
+          ]
+        },
+        {
+          "masterCount": 52,
+          "processOrder": "5.5",
+          "id": "SCAI-Prod-Security-SecretsManager",
+          "name": "Secrets Manager",
+          "type": "secretsmanager",
+          "category": "compute",
+          "layer": 5,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Centralized secrets and credential management",
+            "description": "Manages all API credentials, secrets, and authentication tokens with rotation and encryption",
+            "capabilities": [
+              "Secret storage",
+              "Credential rotation",
+              "Encryption",
+              "Access control"
+            ],
+            "integrations": [
+              "AWS Secrets Manager"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Security-DataForSEOClient",
+                "label": "get secret"
+              },
+              {
+                "source": "SCAI-Prod-Security-OpenAIClient",
+                "label": "get secret"
+              },
+              {
+                "source": "SCAI-Prod-Security-CloudwaysAPIClient",
+                "label": "get secret"
+              },
+              {
+                "source": "SCAI-Prod-Security-AmazonProductAPIClient",
+                "label": "get secret"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-041"
+          ]
+        },
+        {
+          "masterCount": 53,
+          "processOrder": "5.6",
+          "id": "SCAI-Prod-Data-ProjectArticlesTable",
+          "name": "Project Articles Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Map projects to articles",
+            "description": "Junction table mapping projects to articles for bulk operations and deployment tracking",
+            "capabilities": [
+              "Project-article mapping",
+              "Deployment status",
+              "Bulk operations",
+              "Article counting"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Deploy-WordPressDeployer",
+                "label": "update"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-046"
+          ]
+        },
+        {
+          "masterCount": 54,
+          "processOrder": "5.7",
+          "id": "SCAI-Prod-Data-ProjectMetadataTable",
+          "name": "Project Metadata Table",
+          "type": "dynamodb",
+          "category": "database",
+          "layer": 6,
+          "metadata": {
+            "type": "DynamoDB Table",
+            "purpose": "Store project metadata",
+            "description": "Stores project-level metadata including name, status, article counts, and deployment information",
+            "capabilities": [
+              "Project metadata",
+              "Status tracking",
+              "Article counting",
+              "Deployment history"
+            ],
+            "integrations": []
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Core-ContentEntryAPI",
+                "label": "create project"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [
+            "CG-046"
+          ]
+        },
+        {
+          "masterCount": 55,
+          "processOrder": "5.8",
+          "id": "SCAI-Prod-Monitor-HighAITokenUsageAlarm",
+          "name": "High AI Token Usage",
+          "type": "cloudwatchalarm",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Alarm",
+            "purpose": "Cost control for AI token usage",
+            "description": "Alert when AI token usage exceeds threshold for cost management",
+            "capabilities": [
+              "Token usage monitoring",
+              "Auto-remediation trigger",
+              "Multi-channel alerting"
+            ],
+            "integrations": [
+              "CloudWatch Metrics",
+              "SNS",
+              "Lambda"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-ErrorCountMetric",
+                "label": "monitors metric"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Alerts-DevOpsTopic",
+                "label": "send alert"
+              },
+              {
+                "target": "SCAI-Prod-Monitor-CostController",
+                "label": "trigger remediation"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 56,
+          "processOrder": "5.81",
+          "id": "SCAI-Prod-Monitor-LambdaErrorAlarm",
+          "name": "Lambda Error Rate",
+          "type": "cloudwatchalarm",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Alarm",
+            "purpose": "Monitor Lambda function errors",
+            "description": "Alert when Lambda error rate exceeds acceptable threshold",
+            "capabilities": [
+              "Error rate monitoring",
+              "Anomaly detection",
+              "Automatic alerting"
+            ],
+            "integrations": [
+              "CloudWatch Metrics",
+              "SNS"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-LambdaLogGroup",
+                "label": "error metric source"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Alerts-DevOpsTopic",
+                "label": "send alert"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 57,
+          "processOrder": "5.82",
+          "id": "SCAI-Prod-Monitor-DeploymentFailureAlarm",
+          "name": "Deployment Failure Alert",
+          "type": "cloudwatchalarm",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Alarm",
+            "purpose": "Monitor deployment success rate",
+            "description": "Alert when deployment workflow fails",
+            "capabilities": [
+              "Deployment monitoring",
+              "Failure alerting",
+              "Automatic rollback trigger"
+            ],
+            "integrations": [
+              "Step Functions",
+              "SNS"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-StepFunctionLogGroup",
+                "label": "execution status"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Alerts-DevOpsTopic",
+                "label": "send alert"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 58,
+          "processOrder": "5.83",
+          "id": "SCAI-Prod-Monitor-CostController",
+          "name": "Cost Controller",
+          "type": "lambda",
+          "category": "compute",
+          "layer": 7,
+          "metadata": {
+            "type": "Lambda Function",
+            "purpose": "Auto-remediation for cost overruns",
+            "description": "Responds to cost alarms and implements throttling or shutdowns",
+            "capabilities": [
+              "Usage throttling",
+              "Emergency shutdown",
+              "Budget enforcement"
+            ],
+            "integrations": [
+              "CloudWatch Alarms",
+              "SNS"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-HighAITokenUsageAlarm",
+                "label": "alarm trigger"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Security-BudgetManager",
+                "label": "update limits"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 59,
+          "processOrder": "5.84",
+          "id": "SCAI-Prod-Monitor-ErrorCountMetric",
+          "name": "Error Count Metric",
+          "type": "cloudwatchloggroup",
+          "category": "monitoring",
+          "layer": 7,
+          "metadata": {
+            "type": "CloudWatch Metric Filter",
+            "purpose": "Extract error metrics from logs",
+            "description": "Metric filter to count ERROR level log entries",
+            "capabilities": [
+              "Log pattern matching",
+              "Metric generation",
+              "Alarm source"
+            ],
+            "integrations": [
+              "CloudWatch Logs",
+              "CloudWatch Metrics"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-LambdaLogGroup",
+                "label": "filter logs"
+              }
+            ],
+            "outbound": [
+              {
+                "target": "SCAI-Prod-Monitor-HighAITokenUsageAlarm",
+                "label": "provide metric"
+              }
+            ]
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        },
+        {
+          "masterCount": 60,
+          "processOrder": "5.85",
+          "id": "SCAI-Prod-Alerts-DevOpsTopic",
+          "name": "DevOps Alerts",
+          "type": "sns",
+          "category": "messaging",
+          "layer": 7,
+          "metadata": {
+            "type": "SNS Topic",
+            "purpose": "System alerts and notifications",
+            "description": "Critical alerts for DevOps team including errors, budget warnings, and system health",
+            "capabilities": [
+              "Email notifications",
+              "Slack integration",
+              "PagerDuty integration"
+            ],
+            "integrations": [
+              "Email",
+              "Slack",
+              "PagerDuty"
+            ]
+          },
+          "connections": {
+            "inbound": [
+              {
+                "source": "SCAI-Prod-Monitor-HighAITokenUsageAlarm",
+                "label": "alarm triggered"
+              },
+              {
+                "source": "SCAI-Prod-Monitor-LambdaErrorAlarm",
+                "label": "connection"
+              },
+              {
+                "source": "SCAI-Prod-Monitor-DeploymentFailureAlarm",
+                "label": "connection"
+              }
+            ],
+            "outbound": []
+          },
+          "requirements": [],
+          "systems": [
+            "Content Generation"
+          ]
+        }
+      ]
+    }
+  ]
+}

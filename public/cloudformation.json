@@ -1,0 +1,3673 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "SCAI Backend Infrastructure - Complete AWS Resource Definitions for DynamoDB, Secrets Manager, S3, and IAM with proper permissions and relationships (171 total resources mapped, 54 core infrastructure resources defined)",
+  "Metadata": {
+    "Version": "1.0.0",
+    "LastUpdated": "2025-11-08",
+    "TotalResources": 54,
+    "ResourceBreakdown": {
+      "IAM": 9,
+      "DynamoDB": 24,
+      "S3": 10,
+      "SecretsManager": 11
+    },
+    "Systems": [
+      "Site Builder",
+      "Content Generation",
+      "QA Application"
+    ],
+    "Documentation": {
+      "DynamoDB": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-dynamodb-table.html",
+      "SecretsManager": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-secretsmanager-secret.html",
+      "S3": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-s3-bucket.html",
+      "IAM": "https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-role.html"
+    },
+    "DeploymentNotes": [
+      "Deploy IAM roles first (dependency for other resources)",
+      "Then deploy S3 buckets and Secrets Manager",
+      "Finally deploy DynamoDB tables",
+      "Ensure CAPABILITY_NAMED_IAM capability when deploying IAM resources",
+      "Replace {AccountId} placeholders with actual AWS Account ID"
+    ]
+  },
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "Prod",
+      "AllowedValues": [
+        "Prod",
+        "Dev",
+        "Test"
+      ],
+      "Description": "Deployment environment"
+    },
+    "AccountId": {
+      "Type": "String",
+      "Description": "AWS Account ID for S3 bucket naming"
+    }
+  },
+  "Resources": {
+    "SCAIProdCoreExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Core-ExecutionRole",
+        "Description": "Execution role for Core layer Lambda functions with access to DynamoDB, S3, and Secrets Manager",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Core-ExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "1"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdOrchestrationExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Orchestration-ExecutionRole",
+        "Description": "Execution role for AI Orchestration layer Lambda functions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Orchestration-ExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "2"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdOrchestrationAIExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Orchestration-AIExecutionRole",
+        "Description": "AI Lambda permissions with external API access via Secrets Manager",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Orchestration-AIExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "2"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdCommExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Comm-ExecutionRole",
+        "Description": "Execution role for Communication layer Lambda functions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Comm-ExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "3"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDeployExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Deploy-ExecutionRole",
+        "Description": "Execution role for Deployment layer Lambda functions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Deploy-ExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "5"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDeployDeploymentExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Deploy-DeploymentExecutionRole",
+        "Description": "Content Generation deployment Lambda permissions with Cloudways API access",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Deploy-DeploymentExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "5"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDeployStepFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Deploy-StepFunctionRole",
+        "Description": "Permissions for Step Functions to orchestrate Lambda functions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Deploy-StepFunctionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "5"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDeployStepFunctionExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Deploy-StepFunctionExecutionRole",
+        "Description": "Step Functions orchestration permissions for Content Generation workflows",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Deploy-StepFunctionExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "S3Access",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:GetObjectVersion"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "StepFunctionsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "states:StartExecution",
+                    "states:DescribeExecution",
+                    "states:StopExecution"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "5"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityLambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "SCAI-Prod-Security-LambdaExecutionRole",
+        "Description": "Base execution role for all Lambda functions with CloudWatch Logs access",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com",
+                  "states.amazonaws.com"
+                ]
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "SCAI-Prod-Security-LambdaExecutionRole-Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "DynamoDBAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "dynamodb:BatchGetItem",
+                    "dynamodb:BatchWriteItem",
+                    "dynamodb:DescribeTable"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "SecretsManagerAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "LambdaInvokeAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "CloudWatchLogsAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Sid": "XRayAccess",
+                  "Effect": "Allow",
+                  "Action": [
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataPreviewStateTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-PreviewStateTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataCredentialsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-CredentialsTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataChatHistoryTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ChatHistoryTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataConnectionsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ConnectionsTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataSessionTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-SessionTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "sessionId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "sessionId",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataProjectsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ProjectsTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataUsageTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-UsageTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataPaymentsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-PaymentsTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataTokensTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-TokensTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataApiKeysTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ApiKeysTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataServersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ServersTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataDeploymentHistoryTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-DeploymentHistoryTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataWebhookEvents": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-WebhookEvents",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "timestamp",
+            "AttributeType": "N"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "timestamp",
+            "KeyType": "RANGE"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataUsersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-UsersTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataKeywordClusterTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-KeywordClusterTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataSEOMetricsTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-SEOMetricsTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataLocationModifierTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-LocationModifierTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataBudgetTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-BudgetTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataArticleMetadataTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ArticleMetadataTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "projectId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "projectId",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataUserContextStore": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-UserContextStore",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataArticleAssemblyTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ArticleAssemblyTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataLinkGraphTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-LinkGraphTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataProjectArticlesTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ProjectArticlesTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdDataProjectMetadataTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "SCAI-Prod-Data-ProjectMetadataTable",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "projectId",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "projectId",
+            "KeyType": "HASH"
+          }
+        ],
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true,
+          "SSEType": "KMS"
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "database"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodtemplates": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-templates-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "1"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodpreviewstates": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-preview-states-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodgeneratedassets": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-generated-assets-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodprompts": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-prompts-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodprocesslogs": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-process-logs-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodpackages": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-packages-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "5"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodprompttemplates": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-prompttemplates-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodrawarticle": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-rawarticle-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodenhancedarticle": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-enhancedarticle-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "scaiprodimages": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "scai-prod-images-{AccountId}",
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              },
+              "BucketKeyEnabled": true
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpirationInDays": 90
+            },
+            {
+              "Id": "TransitionToIA",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "StorageClass": "STANDARD_IA",
+                  "TransitionInDays": 30
+                }
+              ]
+            }
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "storage"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityAIModelKeys": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-AIModelKeys",
+        "Description": "Stores AI model API keys.",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityThirdPartyAPIs": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-ThirdPartyAPIs",
+        "Description": "Stores all third-party credentials.",
+        "SecretString": "{\"apiKey\": \"PLACEHOLDER_API_KEY\", \"apiSecret\": \"PLACEHOLDER_API_SECRET\", \"endpoint\": \"PLACEHOLDER_ENDPOINT\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityWordPressKeys": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-WordPressKeys",
+        "Description": "Stores WordPress security keys.",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityDatabaseCredentials": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-DatabaseCredentials",
+        "Description": "Stores MySQL credentials for WordPress instances.",
+        "SecretString": "{\"username\": \"PLACEHOLDER_USERNAME\", \"password\": \"PLACEHOLDER_PASSWORD\", \"host\": \"PLACEHOLDER_HOST\", \"port\": \"PLACEHOLDER_PORT\", \"database\": \"PLACEHOLDER_DATABASE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecuritySSHKeys": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-SSHKeys",
+        "Description": "Stores SSH private keys.",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityTemporaryCustomerCredentials": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-TemporaryCustomerCredentials",
+        "Description": "Secrets Manager secret storing temporary credentials for customer-provided external services like Cloudways accounts, cPanel hosting, and custom deployment targets with automatic expiration and rotation policies",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "4"
+          },
+          {
+            "Key": "Category",
+            "Value": "security"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityDataForSEOClient": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-DataForSEOClient",
+        "Description": "Manages authentication and secure API calls to DataForSEO with credential rotation",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "Category",
+            "Value": "compute"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityOpenAIClient": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-OpenAIClient",
+        "Description": "Manages authentication and secure API calls to OpenAI with credential rotation and error handling",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "Category",
+            "Value": "compute"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityAmazonProductAPIClient": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-AmazonProductAPIClient",
+        "Description": "Manages authentication and API calls to Amazon Product Advertising API for affiliate products",
+        "SecretString": "{\"apiKey\": \"PLACEHOLDER_API_KEY\", \"apiSecret\": \"PLACEHOLDER_API_SECRET\", \"endpoint\": \"PLACEHOLDER_ENDPOINT\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "Category",
+            "Value": "compute"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecurityCloudwaysAPIClient": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-CloudwaysAPIClient",
+        "Description": "Manages authentication and API calls to Cloudways for WordPress site management",
+        "SecretString": "{\"apiKey\": \"PLACEHOLDER_API_KEY\", \"apiSecret\": \"PLACEHOLDER_API_SECRET\", \"endpoint\": \"PLACEHOLDER_ENDPOINT\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "Category",
+            "Value": "compute"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    },
+    "SCAIProdSecuritySecretsManager": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": "SCAI-Prod-Security-SecretsManager",
+        "Description": "Manages all API credentials, secrets, and authentication tokens with rotation and encryption",
+        "SecretString": "{\"value\": \"PLACEHOLDER_SECRET_VALUE\"}",
+        "KmsKeyId": "alias/aws/secretsmanager",
+        "Tags": [
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "ManagedBy",
+            "Value": "CloudFormation"
+          },
+          {
+            "Key": "System",
+            "Value": "SCAI"
+          },
+          {
+            "Key": "Layer",
+            "Value": "6"
+          },
+          {
+            "Key": "Category",
+            "Value": "compute"
+          },
+          {
+            "Key": "CreatedDate",
+            "Value": "2025-11-08"
+          }
+        ]
+      }
+    }
+  }
+}
